@@ -16,6 +16,7 @@ import {
     type PlayerRow,
     type RoomRow,
 } from '../../lib/supabase'
+import { drawSoftStars, theme } from '../theme'
 
 interface GameSceneData {
     demo?: boolean
@@ -64,6 +65,7 @@ export class GameScene extends Phaser.Scene {
     }
     private keyHandler!: (event: KeyboardEvent) => void
     private statusText!: Phaser.GameObjects.Text
+    private interactionHint!: Phaser.GameObjects.Text
     private taskText!: Phaser.GameObjects.Text
     private timerText!: Phaser.GameObjects.Text
     private answerPanel!: Phaser.GameObjects.Text
@@ -115,36 +117,40 @@ export class GameScene extends Phaser.Scene {
         const height = this.cameras.main.height
         const centerX = width / 2
         const centerY = height / 2
-        this.cameras.main.setBackgroundColor('#dce9f5')
+        this.cameras.main.setBackgroundColor(theme.background)
+        drawSoftStars(this, 70)
         this.physics.world.setBounds(20, 74, width - 40, height - 92)
 
-        this.add.rectangle(centerX, centerY, width - 42, height - 92, 0xf0f6fb)
-            .setStrokeStyle(5, 0x17243b)
+        this.add.rectangle(centerX, centerY, width - 42, height - 92, 0xf7f3fa)
+            .setStrokeStyle(2, theme.border)
             .setDepth(-2)
 
-        this.add.text(centerX, 24, 'COSMO CREW — NAVE DE PESQUISA', {
-            fontFamily: 'Arial',
-            fontSize: '25px',
+        this.add.rectangle(centerX, 34, Math.min(width - 40, 760), 54, theme.surface)
+            .setStrokeStyle(1, theme.border)
+            .setDepth(8)
+        this.add.text(centerX, 34, 'AstroLearn  ·  COSMO CREW', {
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '20px',
             fontStyle: 'bold',
-            color: '#17243b',
-        }).setOrigin(0.5, 0)
+            color: '#352442',
+        }).setOrigin(0.5).setDepth(9)
 
         this.taskText = this.add.text(34, 78, '', {
-            fontFamily: 'Arial',
-            fontSize: '16px',
-            color: '#17243b',
-            backgroundColor: '#ffffff',
-            padding: { x: 12, y: 9 },
-            lineSpacing: 4,
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '15px',
+            color: '#352442',
+            backgroundColor: '#fffefa',
+            padding: { x: 15, y: 12 },
+            lineSpacing: 6,
         }).setDepth(10)
 
         this.timerText = this.add.text(width - 34, 83, '', {
-            fontFamily: 'Arial',
-            fontSize: '23px',
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '21px',
             fontStyle: 'bold',
-            color: '#17243b',
-            backgroundColor: '#ffffff',
-            padding: { x: 12, y: 8 },
+            color: '#352442',
+            backgroundColor: '#fffefa',
+            padding: { x: 15, y: 10 },
         }).setOrigin(1, 0).setDepth(10)
 
         this.stations = [
@@ -170,37 +176,49 @@ export class GameScene extends Phaser.Scene {
         const roleLabel = this.crewPlayer
             ? `${this.crewPlayer.name} — ${roleNames[this.crewPlayer.role]}`
             : 'Tripulante de demonstração'
-        this.add.text(34, height - 33, `${roleLabel}  •  WASD / setas para mover  •  E para interagir`, {
-            fontFamily: 'Arial',
+        this.add.rectangle(centerX, height - 28, Math.min(width - 40, 760), 38, theme.surface)
+            .setStrokeStyle(1, theme.border)
+            .setDepth(8)
+        this.add.text(centerX, height - 28, `${roleLabel}  ·  WASD / setas para mover  ·  E para interagir`, {
+            fontFamily: 'Arial, sans-serif',
             fontSize: '14px',
-            color: '#17243b',
-        }).setOrigin(0, 1).setDepth(10)
+            color: '#786d7f',
+        }).setOrigin(0.5).setDepth(10)
 
         this.statusText = this.add.text(centerX, height - 63, '', {
-            fontFamily: 'Arial',
-            fontSize: '17px',
-            color: '#17243b',
-            backgroundColor: '#ffffff',
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '16px',
+            color: '#352442',
+            backgroundColor: '#fffefa',
             padding: { x: 14, y: 8 },
             align: 'center',
             wordWrap: { width: Math.min(width - 60, 700) },
         }).setOrigin(0.5).setDepth(15)
 
+        this.interactionHint = this.add.text(centerX, height - 95, '', {
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '14px',
+            fontStyle: 'bold',
+            color: '#684080',
+            backgroundColor: '#f4eff8',
+            padding: { x: 12, y: 6 },
+        }).setOrigin(0.5).setDepth(14).setVisible(false)
+
         this.answerPanel = this.add.text(centerX, centerY, '', {
-            fontFamily: 'Arial',
+            fontFamily: 'Arial, sans-serif',
             fontSize: '23px',
-            color: '#17243b',
-            backgroundColor: '#ffffff',
+            color: '#352442',
+            backgroundColor: '#fffefa',
             padding: { x: 28, y: 20 },
             align: 'center',
             wordWrap: { width: Math.min(width - 80, 600) },
         }).setOrigin(0.5).setDepth(30).setVisible(false)
 
         this.answerText = this.add.text(centerX, centerY + 92, '', {
-            fontFamily: 'Arial',
+            fontFamily: 'Arial, sans-serif',
             fontSize: '22px',
-            color: '#17243b',
-            backgroundColor: '#eaf0ff',
+            color: '#352442',
+            backgroundColor: '#f4eff8',
             padding: { x: 16, y: 10 },
         }).setOrigin(0.5).setDepth(31).setVisible(false)
 
@@ -246,6 +264,11 @@ export class GameScene extends Phaser.Scene {
             remote.label.setPosition(remote.circle.x, remote.circle.y - 31)
         }
 
+        const station = this.answerOpen ? null : this.nearestStation()
+        this.interactionHint
+            .setText(station ? `Pressione E para ${this.stationActionLabel(station.name)}` : '')
+            .setVisible(Boolean(station))
+
         this.updateTimer()
         if (this.gameChannel && this.crewPlayer && time - this.lastBroadcastAt >= 100) {
             this.lastBroadcastAt = time
@@ -259,21 +282,21 @@ export class GameScene extends Phaser.Scene {
 
     private createStationObjects() {
         const colors: Record<StationName, number> = {
-            archive: 0xffe08a,
-            repair: 0x70c990,
-            terminal: 0x5596e6,
-            reactor: 0xd598f2,
+            archive: 0xf4e2a8,
+            repair: 0xcde8d9,
+            terminal: 0xd8e9f3,
+            reactor: 0xe8ddf1,
         }
 
         for (const station of this.stations) {
-            const marker = this.add.rectangle(station.x, station.y, 94, 70, colors[station.name])
-                .setStrokeStyle(4, 0x17243b)
+            const marker = this.add.rectangle(station.x, station.y, 112, 78, colors[station.name])
+                .setStrokeStyle(2, theme.border)
                 .setDepth(2)
             this.add.text(station.x, station.y, station.label, {
-                fontFamily: 'Arial',
-                fontSize: '13px',
+                fontFamily: 'Arial, sans-serif',
+                fontSize: '12px',
                 fontStyle: 'bold',
-                color: '#17243b',
+                color: '#493b50',
                 align: 'center',
             }).setOrigin(0.5).setDepth(3)
             this.physics.add.existing(marker, true)
@@ -282,7 +305,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     private createWall(x: number, y: number, width: number, height: number) {
-        const wall = this.add.rectangle(x, y, width, height, 0x526277).setDepth(1)
+        const wall = this.add.rectangle(x, y, width, height, 0xc8bdd0).setDepth(1)
         this.physics.add.existing(wall, true)
         this.physics.add.collider(this.player, wall)
     }
@@ -415,6 +438,16 @@ export class GameScene extends Phaser.Scene {
             }
         }
         return nearest
+    }
+
+    private stationActionLabel(station: StationName) {
+        const labels: Record<StationName, string> = {
+            archive: 'consultar o arquivo',
+            repair: 'trabalhar no reparo',
+            terminal: 'usar o terminal',
+            reactor: 'ativar a nave',
+        }
+        return labels[station]
     }
 
     private async interact(station: Station) {
@@ -600,24 +633,34 @@ export class GameScene extends Phaser.Scene {
         if (this.finished) return
         this.finished = true
         this.resultsPanel.removeAll(true)
+        const backdrop = this.add.rectangle(
+            0,
+            0,
+            this.scale.width,
+            this.scale.height,
+            theme.ink,
+            0.28,
+        )
+        const card = this.add.rectangle(0, 0, Math.min(480, this.scale.width - 32), 260, theme.surface)
+            .setStrokeStyle(1, theme.border)
         const title = this.add.text(0, -45, victory ? 'MISSÃO CONCLUÍDA!' : 'OXIGÊNIO ESGOTADO', {
-            fontFamily: 'Arial',
-            fontSize: '30px',
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '28px',
             fontStyle: 'bold',
-            color: victory ? '#167a4a' : '#c62828',
+            color: victory ? '#4d966e' : '#ae5264',
         }).setOrigin(0.5)
         const score = this.add.text(0, 2, `Pontuação da tripulação: ${this.score}`, {
-            fontFamily: 'Arial',
-            fontSize: '20px',
-            color: '#17243b',
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '18px',
+            color: '#352442',
         }).setOrigin(0.5)
         const replay = this.add.text(0, 54, 'JOGAR NOVAMENTE', {
-            fontFamily: 'Arial',
-            fontSize: '17px',
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '15px',
             fontStyle: 'bold',
-            color: this.crewPlayer?.is_host ? '#1769aa' : '#8b96a5',
-            backgroundColor: '#eaf0ff',
-            padding: { x: 14, y: 9 },
+            color: this.crewPlayer?.is_host ? '#684080' : '#998da0',
+            backgroundColor: '#f4eff8',
+            padding: { x: 16, y: 10 },
         }).setOrigin(0.5)
         if (this.mission.testMode) replay.setText('REPETIR TESTE')
         if (this.crewPlayer?.is_host && this.room) {
@@ -625,14 +668,14 @@ export class GameScene extends Phaser.Scene {
             replay.on('pointerdown', () => this.replay())
         }
         const exit = this.add.text(0, 105, 'SAIR PARA O LOBBY', {
-            fontFamily: 'Arial',
-            fontSize: '16px',
-            color: '#1769aa',
-            backgroundColor: '#eaf0ff',
-            padding: { x: 14, y: 8 },
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '14px',
+            color: '#684080',
+            backgroundColor: '#f4eff8',
+            padding: { x: 15, y: 9 },
         }).setOrigin(0.5).setInteractive({ useHandCursor: true })
         exit.on('pointerdown', () => this.exitToLobby())
-        this.resultsPanel.add([title, score, replay, exit])
+        this.resultsPanel.add([backdrop, card, title, score, replay, exit])
         this.resultsPanel.setVisible(true)
         this.statusText.setVisible(false)
     }
@@ -667,7 +710,7 @@ export class GameScene extends Phaser.Scene {
         if (!this.statusText) return
         const sequence = ++this.noticeSequence
         this.statusText.setText(message)
-        this.statusText.setColor(isError ? '#b71c1c' : '#17243b')
+        this.statusText.setColor(isError ? '#ae5264' : '#352442')
         this.statusText.setVisible(true)
         this.messageTimer?.remove(false)
         this.messageTimer = this.time.delayedCall(6000, () => {

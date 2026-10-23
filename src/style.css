@@ -12,7 +12,7 @@ body,
 
 body {
   overflow: hidden;
-  background-color: #f7fbff;
+  background-color: #faf8f2;
 }
 
 canvas {
@@ -27,15 +27,15 @@ canvas {
   justify-items: center;
   gap: 12px;
   padding: 32px;
-  color: #ffffff;
-  background: #101a38;
+  color: #352442;
+  background: #faf8f2;
   font-family: Arial, sans-serif;
   text-align: center;
 }
 
 #startup-message h1 {
   margin: 0;
-  color: #55d6be;
+  color: #8050a0;
 }
 
 #startup-message p {
@@ -47,7 +47,7 @@ canvas {
 #startup-message code {
   padding: 10px 16px;
   border-radius: 6px;
-  color: #17243b;
-  background: #55d6be;
+  color: #ffffff;
+  background: #8050a0;
   font-size: 18px;
 }

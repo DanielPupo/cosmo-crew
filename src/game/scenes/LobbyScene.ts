@@ -12,6 +12,7 @@ import {
     type PlayerRow,
     type RoomRow,
 } from '../../lib/supabase'
+import { drawSoftStars, theme } from '../theme'
 
 const roleNames: Record<PlayerRow['role'], string> = {
     pilot: 'Piloto',
@@ -27,9 +28,12 @@ export class LobbyScene extends Phaser.Scene {
     private stopWatching: (() => void) | null = null
     private statusText!: Phaser.GameObjects.Text
     private roomCodeText!: Phaser.GameObjects.Text
-    private crewText!: Phaser.GameObjects.Text
+    private crewSlots: Phaser.GameObjects.Text[] = []
     private startButton!: Phaser.GameObjects.Rectangle
     private startLabel!: Phaser.GameObjects.Text
+    private dialogContainer: Phaser.GameObjects.Container | null = null
+    private dialogHandler: ((event: KeyboardEvent) => void) | null = null
+    private closeDialog: ((value: string | null) => void) | null = null
     private busy = false
     private transitioning = false
 
@@ -46,66 +50,113 @@ export class LobbyScene extends Phaser.Scene {
         this.stopWatching?.()
         this.stopWatching = null
 
-        this.cameras.main.setBackgroundColor('#101a38')
+        this.cameras.main.setBackgroundColor(theme.background)
         const centerX = this.cameras.main.centerX
-        const centerY = this.cameras.main.centerY
+        const width = this.scale.width
+        const height = this.scale.height
+        const compact = width < 680 || height < 620
+        const panelWidth = Math.min(width - 32, 850)
+        const headerWidth = Math.min(width - 32, 1120)
+        const headerY = Math.max(36, Math.min(58, height * 0.09))
+        const top = compact ? headerY + 50 : 120
+        const panelHeight = Math.min(height - top - 18, 570)
+        const compactScale = compact ? Math.max(0.68, Math.min(1, panelHeight / 480)) : 1
+        const rowGap = compact ? 40 * compactScale : 72
+        const cardWidth = Math.min(compact ? 420 : 340, (panelWidth - 60) / (compact ? 1 : 2))
+        const columns = compact ? 1 : 2
 
-        for (let i = 0; i < 90; i += 1) {
-            this.add.circle(
-                Phaser.Math.Between(0, this.cameras.main.width),
-                Phaser.Math.Between(0, this.cameras.main.height),
-                Phaser.Math.Between(1, 2),
-                0xffffff,
-                Phaser.Math.FloatBetween(0.25, 0.85),
-            )
-        }
+        drawSoftStars(this, 45)
 
-        this.add.text(centerX, centerY - 210, 'SALA DA TRIPULAÇÃO', {
-            fontFamily: 'Arial',
-            fontSize: '38px',
-            fontStyle: 'bold',
-            color: '#ffffff',
-        }).setOrigin(0.5)
-
-        this.add.text(centerX, centerY - 160, 'Quatro funções. Uma missão em equipe.', {
-            fontFamily: 'Arial',
+        this.add.rectangle(centerX, headerY, headerWidth, 64, theme.surface)
+            .setStrokeStyle(1, theme.border)
+        this.add.circle(centerX - headerWidth / 2 + 120, headerY, 14, theme.lilac)
+        this.add.circle(centerX - headerWidth / 2 + 120, headerY, 5, theme.purple)
+        this.add.text(centerX - headerWidth / 2 + 146, headerY, 'AstroLearn', {
+            fontFamily: 'Arial, sans-serif',
             fontSize: '20px',
-            color: '#a9c7ff',
-        }).setOrigin(0.5)
-
-        this.statusText = this.add.text(centerX, centerY - 118, '', {
-            fontFamily: 'Arial',
-            fontSize: '17px',
-            color: '#55d6be',
-            align: 'center',
-            wordWrap: { width: Math.min(700, this.cameras.main.width - 40) },
-        }).setOrigin(0.5)
-
-        this.roomCodeText = this.add.text(centerX, centerY - 76, '', {
-            fontFamily: 'Arial',
-            fontSize: '26px',
             fontStyle: 'bold',
-            color: '#ffffff',
+            color: '#352442',
+        }).setOrigin(0, 0.5)
+        this.add.text(centerX + headerWidth / 2 - 20, headerY, compact ? 'COSMO CREW' : 'COSMO CREW  ·  JOGO STEAM', {
+            fontFamily: 'Arial, sans-serif',
+            fontSize: compact ? '10px' : '12px',
+            fontStyle: 'bold',
+            color: '#80638e',
+        }).setOrigin(1, 0.5)
+
+        const panelCenterY = top + panelHeight / 2
+        this.add.rectangle(centerX + 3, panelCenterY + 5, panelWidth, panelHeight, 0xebe3ea, 0.6)
+        this.add.rectangle(centerX, panelCenterY, panelWidth, panelHeight, theme.surface)
+            .setStrokeStyle(1, theme.border)
+
+        this.add.text(centerX, top + (compact ? 27 : 34) * compactScale, 'Vamos montar a tripulação?', {
+            fontFamily: 'Arial, sans-serif',
+            fontSize: compact ? `${Math.max(18, 24 * compactScale)}px` : '31px',
+            fontStyle: 'bold',
+            color: '#352442',
+        }).setOrigin(0.5)
+        this.add.text(centerX, top + (compact ? 49 : 64) * compactScale, 'Cada pessoa tem uma pista importante para a missão.', {
+            fontFamily: 'Arial, sans-serif',
+            fontSize: compact ? `${Math.max(10, 13 * compactScale)}px` : '16px',
+            color: '#786d7f',
         }).setOrigin(0.5)
 
-        this.crewText = this.add.text(centerX, centerY - 15, this.formatCrew(), {
-            fontFamily: 'Arial',
-            fontSize: '19px',
-            color: '#e8efff',
-            align: 'left',
-            lineSpacing: 9,
+        this.statusText = this.add.text(centerX, top + (compact ? 68 : 94) * compactScale, '', {
+            fontFamily: 'Arial, sans-serif',
+            fontSize: compact ? `${Math.max(10, 12 * compactScale)}px` : '14px',
+            color: '#8050a0',
+            align: 'center',
+            wordWrap: { width: panelWidth - 48 },
         }).setOrigin(0.5)
 
-        this.createButton(centerX - 170, centerY + 100, 'CRIAR SALA', 0x55d6be, () => this.onCreateRoom())
-        this.createButton(centerX + 170, centerY + 100, 'ENTRAR EM SALA', 0x315ee8, () => this.onJoinRoom())
-        this.createButton(centerX, centerY + 155, 'DEMO LOCAL', 0x526277, () => {
-            this.scene.start('GameScene', { demo: true })
+        const rosterY = top + (compact ? 126 * compactScale : 175)
+        const rosterStartY = rosterY - rowGap / 2
+        const roleOrder: PlayerRow['role'][] = ['pilot', 'gunner', 'engineer', 'explorer']
+        const roleColors = [0x7a9fe5, 0xe78d8b, 0x72b48e, 0xe7bd5c]
+        this.crewSlots = roleOrder.map((role, index) => {
+            const column = index % columns
+            const row = Math.floor(index / columns)
+            const x = centerX + (columns === 1 ? 0 : column === 0 ? -(cardWidth / 2 + 10) : cardWidth / 2 + 10)
+            const y = rosterStartY + row * rowGap
+            this.add.rectangle(x, y, cardWidth, compact ? 36 * compactScale : 58, 0xfbf9fc)
+                .setStrokeStyle(1, theme.border)
+            this.add.circle(x - cardWidth / 2 + 20, y, compact ? 9 * compactScale : 12, roleColors[index])
+            this.add.text(x - cardWidth / 2 + (compact ? 20 : 23), y, roleNames[role][0], {
+                fontFamily: 'Arial, sans-serif',
+                fontSize: compact ? `${Math.max(8, 9 * compactScale)}px` : '11px',
+                fontStyle: 'bold',
+                color: '#ffffff',
+            }).setOrigin(0.5)
+            return this.add.text(x - cardWidth / 2 + (compact ? 38 : 44), y, '', {
+                fontFamily: 'Arial, sans-serif',
+                fontSize: compact ? `${Math.max(9, 12 * compactScale)}px` : '14px',
+                color: '#786d7f',
+                wordWrap: { width: cardWidth - 58 },
+            }).setOrigin(0, 0.5)
         })
 
-        this.startButton = this.add.rectangle(centerX, centerY + 220, 290, 58, 0x526277)
-        this.startLabel = this.add.text(centerX, centerY + 220, 'INICIAR MISSÃO (4/4)', {
-            fontFamily: 'Arial',
-            fontSize: '19px',
+        this.roomCodeText = this.add.text(centerX, top + (compact ? 250 * compactScale : 268), '', {
+            fontFamily: 'Arial, sans-serif',
+            fontSize: compact ? `${Math.max(12, 16 * compactScale)}px` : '20px',
+            fontStyle: 'bold',
+            color: '#684080',
+        }).setOrigin(0.5)
+
+        const buttonsY = top + (compact ? 278 * compactScale : 319)
+        const buttonWidth = Math.min(270, (panelWidth - 56) / 2)
+        const buttonHeight = compact ? 38 : 48
+        this.createButton(centerX - buttonWidth / 2 - 10, buttonsY, 'CRIAR SALA', theme.purple, () => this.onCreateRoom(), buttonWidth, 0xffffff, buttonHeight)
+        this.createButton(centerX + buttonWidth / 2 + 10, buttonsY, 'ENTRAR NA SALA', theme.surfaceSoft, () => this.onJoinRoom(), buttonWidth, theme.purpleDark, buttonHeight)
+        this.createButton(centerX, top + (compact ? 345 * compactScale : 370), 'EXPLORAR DEMO LOCAL', theme.surface, () => {
+            this.scene.start('GameScene', { demo: true })
+        }, 250, theme.muted, buttonHeight)
+
+        const startY = top + panelHeight - (compact ? 26 * compactScale : 32)
+        this.startButton = this.add.rectangle(centerX, startY, Math.min(panelWidth - 60, 300), 46, theme.purple)
+            .setStrokeStyle(1, theme.purple)
+        this.startLabel = this.add.text(centerX, startY, 'INICIAR MISSÃO · 4/4', {
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '15px',
             fontStyle: 'bold',
             color: '#ffffff',
         }).setOrigin(0.5)
@@ -114,21 +165,25 @@ export class LobbyScene extends Phaser.Scene {
         this.startButton.setInteractive({ useHandCursor: true })
         this.startButton.on('pointerdown', () => this.onStartMission())
 
-        const back = this.add.text(30, 26, '← VOLTAR', {
-            fontFamily: 'Arial',
-            fontSize: '18px',
-            color: '#ffffff',
-        }).setInteractive({ useHandCursor: true })
+        const back = this.add.text(30, headerY, '←  Início', {
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '14px',
+            color: '#786d7f',
+            backgroundColor: '#fffefa',
+            padding: { x: 12, y: 8 },
+        }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true })
         back.on('pointerdown', () => this.onBack())
 
         this.statusText.setText(
             isSupabaseConfigured()
-                ? 'Multiplayer pronto. Crie uma sala ou informe um código.'
-                : 'Multiplayer não configurado. Use DEMO LOCAL ou configure .env.local.',
+                ? 'Multiplayer pronto. Crie uma sala ou entre com um código.'
+                : 'Demo disponível · Multiplayer online não configurado.',
         )
-        if (!isSupabaseConfigured()) this.statusText.setColor('#ffd166')
+        if (!isSupabaseConfigured()) this.statusText.setColor('#8a6c97')
+        this.renderCrew()
 
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+            this.closeDialog?.(null)
             this.stopWatching?.()
             this.stopWatching = null
         })
@@ -140,15 +195,20 @@ export class LobbyScene extends Phaser.Scene {
         label: string,
         color: number,
         action: () => void,
+        width = 270,
+        textColor = 0xffffff,
+        height = 48,
     ) {
-        const rect = this.add.rectangle(x, y, 270, 58, color)
+        const rect = this.add.rectangle(x, y, width, height, color)
             .setInteractive({ useHandCursor: true })
         this.add.text(x, y, label, {
-            fontFamily: 'Arial',
-            fontSize: '19px',
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '13px',
             fontStyle: 'bold',
-            color: '#ffffff',
+            color: `#${textColor.toString(16).padStart(6, '0')}`,
         }).setOrigin(0.5)
+        rect.on('pointerover', () => rect.setAlpha(0.86))
+        rect.on('pointerout', () => rect.setAlpha(1))
         rect.on('pointerdown', action)
     }
 
@@ -159,7 +219,7 @@ export class LobbyScene extends Phaser.Scene {
             return
         }
 
-        const name = window.prompt('Nome do tripulante:', 'Tripulante Azul')
+        const name = await this.requestText('Qual é o seu nome, astronauta?', 'Tripulante Azul', 20)
         if (!name) return
         this.busy = true
         this.setStatus('Conectando ao Supabase e criando sala...')
@@ -180,9 +240,9 @@ export class LobbyScene extends Phaser.Scene {
             return
         }
 
-        const code = window.prompt('Digite o código de cinco caracteres:')
+        const code = await this.requestText('Qual é o código da sala?', 'ABCDE', 5, true)
         if (!code) return
-        const name = window.prompt('Nome do tripulante:', 'Tripulante')
+        const name = await this.requestText('Como podemos chamar você?', 'Tripulante', 20)
         if (!name) return
         this.busy = true
         this.setStatus('Procurando a sala...')
@@ -232,23 +292,156 @@ export class LobbyScene extends Phaser.Scene {
 
     private formatCrew() {
         const roleOrder: PlayerRow['role'][] = ['pilot', 'gunner', 'engineer', 'explorer']
-        return roleOrder.map((role, index) => {
+        return roleOrder.map((role) => {
             const player = this.players.find((member) => member.role === role)
             return player
-                ? `${index + 1}. ${roleNames[role]} — ${player.name}${player.is_host ? ' (anfitrião)' : ''}`
-                : `${index + 1}. ${roleNames[role]} — aguardando`
-        }).join('\n')
+                ? `${roleNames[role]}   ·   ${player.name}${player.is_host ? '  (anfitrião)' : ''}`
+                : `${roleNames[role]}   ·   aguardando tripulante`
+        })
+    }
+
+    private requestText(
+        title: string,
+        placeholder: string,
+        maxLength: number,
+        uppercase = false,
+    ): Promise<string | null> {
+        if (this.dialogContainer) return Promise.resolve(null)
+
+        return new Promise((resolve) => {
+            const centerX = this.scale.width / 2
+            const centerY = this.scale.height / 2
+            const container = this.add.container(0, 0).setDepth(100)
+            const backdrop = this.add.rectangle(
+                centerX,
+                centerY,
+                this.scale.width,
+                this.scale.height,
+                theme.ink,
+                0.42,
+            ).setInteractive()
+            const panel = this.add.rectangle(centerX, centerY, Math.min(this.scale.width - 40, 440), 244, theme.surface)
+                .setStrokeStyle(1, theme.border)
+            const titleText = this.add.text(centerX, centerY - 72, title, {
+                fontFamily: 'Arial, sans-serif',
+                fontSize: '22px',
+                fontStyle: 'bold',
+                color: '#352442',
+                align: 'center',
+                wordWrap: { width: 360 },
+            }).setOrigin(0.5)
+            const hintText = this.add.text(centerX, centerY - 38, 'Pressione Enter para continuar · Esc para cancelar', {
+                fontFamily: 'Arial, sans-serif',
+                fontSize: '12px',
+                color: '#786d7f',
+            }).setOrigin(0.5)
+            const field = this.add.rectangle(centerX, centerY + 5, Math.min(this.scale.width - 84, 350), 48, 0xf7f3fa)
+                .setStrokeStyle(1, theme.border)
+            let value = ''
+            const valueText = this.add.text(centerX, centerY + 5, placeholder, {
+                fontFamily: 'Arial, sans-serif',
+                fontSize: '17px',
+                color: '#998da0',
+            }).setOrigin(0.5)
+            const cancelButton = this.add.rectangle(centerX - 90, centerY + 78, 142, 42, theme.surfaceSoft)
+                .setInteractive({ useHandCursor: true })
+            const cancelLabel = this.add.text(cancelButton.x, cancelButton.y, 'Cancelar', {
+                fontFamily: 'Arial, sans-serif',
+                fontSize: '14px',
+                fontStyle: 'bold',
+                color: '#684080',
+            }).setOrigin(0.5)
+            const submitButton = this.add.rectangle(centerX + 90, centerY + 78, 142, 42, theme.purple)
+                .setInteractive({ useHandCursor: true })
+            const submitLabel = this.add.text(submitButton.x, submitButton.y, 'Continuar', {
+                fontFamily: 'Arial, sans-serif',
+                fontSize: '14px',
+                fontStyle: 'bold',
+                color: '#ffffff',
+            }).setOrigin(0.5)
+
+            container.add([
+                backdrop,
+                panel,
+                titleText,
+                hintText,
+                field,
+                valueText,
+                cancelButton,
+                cancelLabel,
+                submitButton,
+                submitLabel,
+            ])
+            this.dialogContainer = container
+
+            let complete = false
+            const finish = (result: string | null) => {
+                if (complete) return
+                complete = true
+                if (this.dialogHandler) {
+                    this.input.keyboard?.off('keydown', this.dialogHandler)
+                }
+                this.dialogHandler = null
+                this.dialogContainer?.removeAll(true)
+                this.dialogContainer?.destroy()
+                this.dialogContainer = null
+                this.closeDialog = null
+                resolve(result)
+            }
+            const submit = () => {
+                const cleaned = value.trim()
+                if (cleaned) finish(uppercase ? cleaned.toUpperCase() : cleaned)
+                else {
+                    valueText.setText('Digite uma informação para continuar.')
+                    valueText.setColor('#b74a66')
+                }
+            }
+
+            this.closeDialog = finish
+            this.dialogHandler = (event) => {
+                if (event.key === 'Escape') {
+                    finish(null)
+                } else if (event.key === 'Enter') {
+                    submit()
+                } else if (event.key === 'Backspace') {
+                    value = value.slice(0, -1)
+                } else if (event.key.length === 1 && !/[\u0000-\u001f]/.test(event.key)) {
+                    if (!uppercase || /^[a-zA-Z0-9]$/.test(event.key)) {
+                        value = (uppercase ? value.toUpperCase() : value) + event.key
+                    }
+                }
+
+                if (!complete && event.key !== 'Enter' && event.key !== 'Escape') {
+                    value = value.slice(0, maxLength)
+                    valueText
+                        .setText(value || placeholder)
+                        .setColor(value ? '#352442' : '#998da0')
+                }
+            }
+            this.input.keyboard?.on('keydown', this.dialogHandler)
+            cancelButton.on('pointerdown', () => finish(null))
+            submitButton.on('pointerdown', submit)
+            backdrop.on('pointerdown', () => finish(null))
+        })
     }
 
     private renderCrew() {
-        if (!this.crewText || !this.startButton) return
-        this.crewText.setText(this.formatCrew())
+        if (!this.crewSlots.length || !this.startButton) return
+        const roleOrder: PlayerRow['role'][] = ['pilot', 'gunner', 'engineer', 'explorer']
+        this.formatCrew().forEach((label, index) => {
+            this.crewSlots[index]?.setText(label)
+            this.crewSlots[index]?.setColor(
+                this.players.some((member) => member.role === roleOrder[index])
+                    ? '#352442'
+                    : '#998da0',
+            )
+        })
         const isHost = this.player?.is_host ?? false
         const isReady = this.players.length === 4
         const canTestMovement = this.players.length >= 2 && !isReady
         this.startButton.setVisible(isHost)
         this.startLabel.setVisible(isHost)
-        this.startButton.setFillStyle(isReady ? 0x55d6be : canTestMovement ? 0xf3c94b : 0x526277)
+        this.startButton.setFillStyle(isReady ? theme.purple : canTestMovement ? theme.gold : 0xc8becd)
         this.startLabel.setText(
             isReady
                 ? 'INICIAR MISSÃO'
@@ -256,7 +449,7 @@ export class LobbyScene extends Phaser.Scene {
                     ? `TESTAR MOVIMENTO (${this.players.length}/4)`
                     : `AGUARDANDO (${this.players.length}/4)`,
         )
-        this.startLabel.setColor(isReady ? '#17243b' : canTestMovement ? '#17243b' : '#ffffff')
+        this.startLabel.setColor(isReady ? '#ffffff' : canTestMovement ? '#684080' : '#ffffff')
         if (isReady || canTestMovement) {
             this.startButton.setInteractive({ useHandCursor: true })
         } else {
@@ -317,7 +510,7 @@ export class LobbyScene extends Phaser.Scene {
     private setStatus(message: string, isError = false) {
         if (this.statusText) {
             this.statusText.setText(message)
-            this.statusText.setColor(isError ? '#ff8e8e' : '#55d6be')
+            this.statusText.setColor(isError ? '#ae5264' : '#8050a0')
         }
     }
 
