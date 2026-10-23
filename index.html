@@ -1,13 +1,22 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>cosmo-crew</title>
+    <meta name="description" content="Cosmo Crew — jogo cooperativo de exploração e desafios STEAM." />
+    <title>Cosmo Crew — Missão cooperativa</title>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <main id="startup-message" role="status">
+        <h1>COSMO CREW</h1>
+        <p>Para iniciar o jogo, abra a pasta do projeto no terminal e execute:</p>
+        <code>npm run dev</code>
+        <p>Depois acesse o endereço local informado pelo Vite (normalmente <code>http://localhost:5173</code>).</p>
+        <p>Não abra este arquivo pelo Live Server: o jogo precisa do Vite para carregar TypeScript e seus módulos.</p>
+      </main>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

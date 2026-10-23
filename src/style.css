@@ -18,3 +18,36 @@ body {
 canvas {
   display: block;
 }
+
+#startup-message {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 12px;
+  padding: 32px;
+  color: #ffffff;
+  background: #101a38;
+  font-family: Arial, sans-serif;
+  text-align: center;
+}
+
+#startup-message h1 {
+  margin: 0;
+  color: #55d6be;
+}
+
+#startup-message p {
+  max-width: 620px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+#startup-message code {
+  padding: 10px 16px;
+  border-radius: 6px;
+  color: #17243b;
+  background: #55d6be;
+  font-size: 18px;
+}

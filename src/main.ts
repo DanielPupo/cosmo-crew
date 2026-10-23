@@ -31,3 +31,4 @@ const config: Phaser.Types.Core.GameConfig = {
 }
 
 new Phaser.Game(config)
+document.querySelector('#startup-message')?.remove()
