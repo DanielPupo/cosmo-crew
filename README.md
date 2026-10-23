@@ -29,6 +29,20 @@ Sem configuração do Supabase, use **DEMO LOCAL** no lobby. A demo roda em um �
 
 Se a senha do banco já foi compartilhada, troque-a no painel do Supabase; não reutilize nem compartilhe essa senha.
 
+## Publicar na Vercel
+
+1. Envie o projeto para um repositório GitHub e importe esse repositório na Vercel. Se `cosmo-crew` estiver dentro de uma pasta maior, selecione `cosmo-crew` como **Root Directory**; se a raiz do repositório já contiver `package.json`, mantenha a raiz padrão.
+2. Use as configurações padrão do Vite ou confirme:
+   - **Build Command:** `npm run build`
+   - **Output Directory:** `dist`
+   - **Install Command:** `npm install`
+3. Em **Project Settings → Environment Variables**, cadastre `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` com os mesmos valores públicos usados no `.env.local`. Selecione os ambientes em que pretende publicar (Production e, se desejar, Preview).
+4. Faça o deploy. Sempre que alterar variáveis de ambiente, gere um novo deploy para que elas sejam incluídas no bundle.
+5. No Supabase, atualize a URL do site em **Authentication → URL Configuration** para o domínio de produção da Vercel. Mantenha **Anonymous Sign-Ins** ativo e confirme que o schema e o Realtime foram configurados.
+6. Abra o endereço publicado e teste a criação e entrada em salas em perfis de navegador independentes. A missão completa precisa de quatro sessões autenticadas separadas.
+
+Não publique `.env.local`, senha do banco ou chave `service_role`. As variáveis `VITE_*` são incorporadas ao frontend; use apenas a URL e a chave pública `anon`/`publishable`.
+
 ## Testar uma partida
 
 1. Abra o jogo em dois perfis de navegador independentes (ou navegadores/dispositivos diferentes). Abas comuns do mesmo perfil compartilham a sessão anônima e não representam jogadores separados.
