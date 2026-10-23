@@ -16,7 +16,7 @@ import {
     type PlayerRow,
     type RoomRow,
 } from '../../lib/supabase'
-import { drawSoftStars, theme } from '../theme'
+import { drawSoftStars, glassPanel, theme } from '../theme'
 
 interface GameSceneData {
     demo?: boolean
@@ -68,8 +68,13 @@ export class GameScene extends Phaser.Scene {
     private interactionHint!: Phaser.GameObjects.Text
     private taskText!: Phaser.GameObjects.Text
     private timerText!: Phaser.GameObjects.Text
+    private scoreText!: Phaser.GameObjects.Text
     private answerPanel!: Phaser.GameObjects.Text
     private answerText!: Phaser.GameObjects.Text
+    private answerControls: Phaser.GameObjects.Container | null = null
+    private touchInteractButton!: Phaser.GameObjects.Arc
+    private touchInteractLabel!: Phaser.GameObjects.Text
+    private touchDirection = new Phaser.Math.Vector2()
     private resultsPanel!: Phaser.GameObjects.Container
     private mission: MissionState = emptyMissionState()
     private room: RoomRow | null = null
@@ -121,104 +126,114 @@ export class GameScene extends Phaser.Scene {
         drawSoftStars(this, 70)
         this.physics.world.setBounds(20, 74, width - 40, height - 92)
 
-        this.add.rectangle(centerX, centerY, width - 42, height - 92, 0xf7f3fa)
-            .setStrokeStyle(2, theme.border)
+        this.add.rectangle(centerX, centerY, width - 42, height - 92, 0x0b1224)
+            .setStrokeStyle(1, theme.border, 0.8)
             .setDepth(-2)
-
-        this.add.rectangle(centerX, 34, Math.min(width - 40, 760), 54, theme.surface)
-            .setStrokeStyle(1, theme.border)
-            .setDepth(8)
+        this.add.rectangle(centerX, centerY, width - 46, height - 96, 0x101a30, 0.42).setDepth(-2)
+        glassPanel(this, centerX, 34, Math.min(width - 40, 760), 54, 8)
         this.add.text(centerX, 34, 'AstroLearn  ·  COSMO CREW', {
-            fontFamily: 'Arial, sans-serif',
+            fontFamily: 'Segoe UI, sans-serif',
             fontSize: '20px',
             fontStyle: 'bold',
-            color: '#352442',
+            color: '#f1f5ff',
+            letterSpacing: 1,
         }).setOrigin(0.5).setDepth(9)
 
-        this.taskText = this.add.text(34, 78, '', {
-            fontFamily: 'Arial, sans-serif',
-            fontSize: '15px',
-            color: '#352442',
-            backgroundColor: '#fffefa',
-            padding: { x: 15, y: 12 },
-            lineSpacing: 6,
+        const hudY = 94
+        const hudCompact = width < 640
+        const taskWidth = Math.min(hudCompact ? 172 : 245, width * 0.4)
+        glassPanel(this, 24 + taskWidth / 2, hudY + 22, taskWidth, 92, 9)
+        this.taskText = this.add.text(36, hudY - 8, '', {
+            fontFamily: 'Segoe UI, sans-serif',
+            fontSize: hudCompact ? '10px' : '13px',
+            color: '#e5edff',
+            lineSpacing: hudCompact ? 2 : 4,
         }).setDepth(10)
 
-        this.timerText = this.add.text(width - 34, 83, '', {
-            fontFamily: 'Arial, sans-serif',
-            fontSize: '21px',
+        const scoreX = width / 2
+        glassPanel(this, scoreX, hudY + 12, hudCompact ? 108 : 148, 48, 9)
+        this.scoreText = this.add.text(scoreX, hudY + 12, 'SCORE  0', {
+            fontFamily: 'Segoe UI, sans-serif',
+            fontSize: hudCompact ? '11px' : '14px',
             fontStyle: 'bold',
-            color: '#352442',
-            backgroundColor: '#fffefa',
-            padding: { x: 15, y: 10 },
-        }).setOrigin(1, 0).setDepth(10)
+            color: '#55d6e8',
+            letterSpacing: 1,
+        }).setOrigin(0.5).setDepth(10)
+
+        const timerX = width - 96
+        glassPanel(this, timerX, hudY + 12, 144, 48, 9)
+        this.timerText = this.add.text(timerX, hudY + 12, '', {
+            fontFamily: 'Segoe UI, sans-serif',
+            fontSize: hudCompact ? '13px' : '18px',
+            fontStyle: 'bold',
+            color: '#f1f5ff',
+        }).setOrigin(0.5).setDepth(10)
 
         this.stations = [
-            { name: 'archive', label: 'ARQUIVO\nDE DADOS', x: centerX - 250, y: centerY - 35 },
-            { name: 'repair', label: 'PAINEL DE\nREPARO', x: centerX + 250, y: centerY - 35 },
+            { name: 'archive', label: 'TERMINAL\nDE DADOS', x: centerX - Math.min(250, width * 0.3), y: centerY - 35 },
+            { name: 'repair', label: 'ESTAÇÃO\nDE REPARO', x: centerX + Math.min(250, width * 0.3), y: centerY - 35 },
             { name: 'terminal', label: 'TERMINAL\nCIENTÍFICO', x: centerX, y: centerY + 125 },
-            { name: 'reactor', label: 'REATIVAR\nA NAVE', x: centerX, y: centerY - 155 },
+            { name: 'reactor', label: 'CORE\nDA NAVE', x: centerX, y: centerY - 155 },
         ]
         const startX = this.crewPlayer?.x ?? centerX
         const startY = this.crewPlayer?.y ?? centerY + 195
         this.player = this.add.circle(startX, startY, 22, this.playerColor())
-            .setStrokeStyle(3, 0xffffff)
+            .setStrokeStyle(3, this.roleColor())
             .setDepth(6)
         this.physics.add.existing(this.player)
         this.body = this.player.body as Phaser.Physics.Arcade.Body
         this.body.setCollideWorldBounds(true)
 
         this.createStationObjects()
-        this.createWall(centerX, centerY + 20, 210, 28)
-        this.createWall(centerX - 180, centerY + 145, 100, 22)
-        this.createWall(centerX + 180, centerY + 145, 100, 22)
+        this.createWall(centerX, centerY + 20, Math.min(210, width * 0.48), 28)
+        const sideWallOffset = Math.min(180, width * 0.31)
+        this.createWall(centerX - sideWallOffset, centerY + 145, Math.min(100, width * 0.24), 22)
+        this.createWall(centerX + sideWallOffset, centerY + 145, Math.min(100, width * 0.24), 22)
 
         const roleLabel = this.crewPlayer
             ? `${this.crewPlayer.name} — ${roleNames[this.crewPlayer.role]}`
             : 'Tripulante de demonstração'
-        this.add.rectangle(centerX, height - 28, Math.min(width - 40, 760), 38, theme.surface)
-            .setStrokeStyle(1, theme.border)
-            .setDepth(8)
+        glassPanel(this, centerX, height - 28, Math.min(width - 40, 760), 38, 8)
         this.add.text(centerX, height - 28, `${roleLabel}  ·  WASD / setas para mover  ·  E para interagir`, {
-            fontFamily: 'Arial, sans-serif',
-            fontSize: '14px',
-            color: '#786d7f',
+            fontFamily: 'Segoe UI, sans-serif',
+            fontSize: width < 600 ? '9px' : '13px',
+            color: '#a2aec8',
         }).setOrigin(0.5).setDepth(10)
 
         this.statusText = this.add.text(centerX, height - 63, '', {
-            fontFamily: 'Arial, sans-serif',
+            fontFamily: 'Segoe UI, sans-serif',
             fontSize: '16px',
-            color: '#352442',
-            backgroundColor: '#fffefa',
+            color: '#f1f5ff',
+            backgroundColor: '#111a2e',
             padding: { x: 14, y: 8 },
             align: 'center',
             wordWrap: { width: Math.min(width - 60, 700) },
         }).setOrigin(0.5).setDepth(15)
 
         this.interactionHint = this.add.text(centerX, height - 95, '', {
-            fontFamily: 'Arial, sans-serif',
+            fontFamily: 'Segoe UI, sans-serif',
             fontSize: '14px',
             fontStyle: 'bold',
-            color: '#684080',
-            backgroundColor: '#f4eff8',
+            color: '#55d6e8',
+            backgroundColor: '#111a2e',
             padding: { x: 12, y: 6 },
         }).setOrigin(0.5).setDepth(14).setVisible(false)
 
-        this.answerPanel = this.add.text(centerX, centerY, '', {
-            fontFamily: 'Arial, sans-serif',
-            fontSize: '23px',
-            color: '#352442',
-            backgroundColor: '#fffefa',
-            padding: { x: 28, y: 20 },
+        this.answerPanel = this.add.text(centerX, centerY - 104, '', {
+            fontFamily: 'Segoe UI, sans-serif',
+            fontSize: width < 500 ? '16px' : '21px',
+            color: '#f1f5ff',
+            backgroundColor: '#111a2e',
+            padding: { x: 18, y: 12 },
             align: 'center',
             wordWrap: { width: Math.min(width - 80, 600) },
         }).setOrigin(0.5).setDepth(30).setVisible(false)
 
-        this.answerText = this.add.text(centerX, centerY + 92, '', {
-            fontFamily: 'Arial, sans-serif',
+        this.answerText = this.add.text(centerX, centerY - 28, '', {
+            fontFamily: 'Segoe UI, sans-serif',
             fontSize: '22px',
-            color: '#352442',
-            backgroundColor: '#f4eff8',
+            color: '#55d6e8',
+            backgroundColor: '#0b1224',
             padding: { x: 16, y: 10 },
         }).setOrigin(0.5).setDepth(31).setVisible(false)
 
@@ -227,6 +242,7 @@ export class GameScene extends Phaser.Scene {
         this.wasd = this.input.keyboard!.addKeys('W,A,S,D') as typeof this.wasd
         this.keyHandler = (event) => this.onKeyDown(event)
         this.input.keyboard!.on('keydown', this.keyHandler)
+        this.createTouchControls(width, height)
 
         this.refreshHud()
         this.showStatus(this.isDemo
@@ -241,33 +257,93 @@ export class GameScene extends Phaser.Scene {
         if (this.room && this.crewPlayer) {
             void this.connectMultiplayer()
         }
+        this.cameras.main.fadeIn(240, 7, 11, 25)
     }
 
-    update(time: number) {
+    private createTouchControls(width: number, height: number) {
+        const centerX = 82
+        const centerY = height - 116
+        const buttonRadius = width < 520 ? 22 : 26
+        const addDirection = (x: number, y: number, label: string, dx: number, dy: number) => {
+            const button = this.add.circle(x, y, buttonRadius, theme.surfaceSoft, 0.88)
+                .setStrokeStyle(1, theme.cyan, 0.72)
+                .setDepth(22)
+                .setInteractive({ useHandCursor: true })
+            const text = this.add.text(x, y, label, {
+                fontFamily: 'Segoe UI, sans-serif',
+                fontSize: '17px',
+                fontStyle: 'bold',
+                color: '#eaf5ff',
+            }).setOrigin(0.5).setDepth(23)
+            button.on('pointerdown', () => this.touchDirection.set(dx, dy))
+            button.on('pointerout', () => this.touchDirection.set(0, 0))
+            text.setInteractive()
+            text.on('pointerdown', () => this.touchDirection.set(dx, dy))
+            text.on('pointerout', () => this.touchDirection.set(0, 0))
+        }
+
+        addDirection(centerX, centerY - 38, '▲', 0, -1)
+        addDirection(centerX, centerY + 38, '▼', 0, 1)
+        addDirection(centerX - 38, centerY, '◀', -1, 0)
+        addDirection(centerX + 38, centerY, '▶', 1, 0)
+
+        const interactX = width - 68
+        this.touchInteractButton = this.add.circle(interactX, centerY, buttonRadius + 7, theme.purple, 0.92)
+            .setStrokeStyle(2, theme.cyan, 0.8)
+            .setDepth(22)
+            .setInteractive({ useHandCursor: true })
+            .setVisible(false)
+        this.touchInteractLabel = this.add.text(interactX, centerY, 'E', {
+            fontFamily: 'Segoe UI, sans-serif',
+            fontSize: '18px',
+            fontStyle: 'bold',
+            color: '#ffffff',
+        }).setOrigin(0.5).setDepth(23).setVisible(false)
+        const interact = () => {
+            const station = this.nearestStation()
+            if (station && !this.answerOpen && !this.actionBusy) void this.interact(station)
+        }
+        this.touchInteractButton.on('pointerdown', interact)
+        this.touchInteractLabel.setInteractive()
+        this.touchInteractLabel.on('pointerdown', interact)
+        this.input.on('pointerup', this.releaseTouchControls, this)
+    }
+
+    private releaseTouchControls() {
+        this.touchDirection.set(0, 0)
+    }
+
+    update(time: number, delta: number) {
         if (!this.body || this.finished) return
         this.body.setVelocity(0)
 
         if (!this.answerOpen) {
             const speed = 190
-            if (this.cursors.left.isDown || this.wasd.A.isDown) this.body.setVelocityX(-speed)
-            if (this.cursors.right.isDown || this.wasd.D.isDown) this.body.setVelocityX(speed)
-            if (this.cursors.up.isDown || this.wasd.W.isDown) this.body.setVelocityY(-speed)
-            if (this.cursors.down.isDown || this.wasd.S.isDown) this.body.setVelocityY(speed)
+            const directionX = Number(this.cursors.right.isDown || this.wasd.D.isDown)
+                - Number(this.cursors.left.isDown || this.wasd.A.isDown)
+                + this.touchDirection.x
+            const directionY = Number(this.cursors.down.isDown || this.wasd.S.isDown)
+                - Number(this.cursors.up.isDown || this.wasd.W.isDown)
+                + this.touchDirection.y
+            this.body.setVelocity(directionX * speed, directionY * speed)
             if (this.body.velocity.length() > 0) {
                 this.body.velocity.normalize().scale(speed)
             }
         }
 
+        const interpolation = 1 - Math.exp(-delta / 75)
         for (const remote of this.remotePlayers.values()) {
-            remote.circle.x = Phaser.Math.Linear(remote.circle.x, remote.targetX, 0.28)
-            remote.circle.y = Phaser.Math.Linear(remote.circle.y, remote.targetY, 0.28)
+            remote.circle.x = Phaser.Math.Linear(remote.circle.x, remote.targetX, interpolation)
+            remote.circle.y = Phaser.Math.Linear(remote.circle.y, remote.targetY, interpolation)
             remote.label.setPosition(remote.circle.x, remote.circle.y - 31)
         }
 
         const station = this.answerOpen ? null : this.nearestStation()
         this.interactionHint
-            .setText(station ? `Pressione E para ${this.stationActionLabel(station.name)}` : '')
+            .setText(station ? `E  ·  ${this.stationActionLabel(station.name)}` : '')
             .setVisible(Boolean(station))
+        this.touchInteractButton.setVisible(Boolean(station))
+        this.touchInteractLabel.setVisible(Boolean(station))
 
         this.updateTimer()
         if (this.gameChannel && this.crewPlayer && time - this.lastBroadcastAt >= 100) {
@@ -282,30 +358,45 @@ export class GameScene extends Phaser.Scene {
 
     private createStationObjects() {
         const colors: Record<StationName, number> = {
-            archive: 0xf4e2a8,
-            repair: 0xcde8d9,
-            terminal: 0xd8e9f3,
-            reactor: 0xe8ddf1,
+            archive: 0x102746,
+            repair: 0x12392f,
+            terminal: 0x143947,
+            reactor: 0x282047,
+        }
+        const glows: Record<StationName, number> = {
+            archive: theme.pilot,
+            repair: theme.engineer,
+            terminal: theme.cyan,
+            reactor: theme.purple,
         }
 
         for (const station of this.stations) {
-            const marker = this.add.rectangle(station.x, station.y, 112, 78, colors[station.name])
-                .setStrokeStyle(2, theme.border)
+            const marker = this.add.rectangle(station.x, station.y, 118, 82, colors[station.name], 0.92)
+                .setStrokeStyle(2, glows[station.name], 0.85)
                 .setDepth(2)
             this.add.text(station.x, station.y, station.label, {
-                fontFamily: 'Arial, sans-serif',
-                fontSize: '12px',
+                fontFamily: 'Segoe UI, sans-serif',
+                fontSize: '11px',
                 fontStyle: 'bold',
-                color: '#493b50',
+                color: '#edf5ff',
                 align: 'center',
+                letterSpacing: 1,
             }).setOrigin(0.5).setDepth(3)
+            this.tweens.add({
+                targets: marker,
+                alpha: 0.76,
+                duration: 1500,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut',
+            })
             this.physics.add.existing(marker, true)
             this.physics.add.collider(this.player, marker)
         }
     }
 
     private createWall(x: number, y: number, width: number, height: number) {
-        const wall = this.add.rectangle(x, y, width, height, 0xc8bdd0).setDepth(1)
+        const wall = this.add.rectangle(x, y, width, height, 0x34415e).setDepth(1)
         this.physics.add.existing(wall, true)
         this.physics.add.collider(this.player, wall)
     }
@@ -406,7 +497,7 @@ export class GameScene extends Phaser.Scene {
                 this.answer += ','
             }
             if (event.key === 'Backspace') this.answer = this.answer.slice(0, -1)
-            this.answerText.setText(`Resposta: ${this.answer || '_'}   •   Enter confirma   •   E cancela`)
+            this.updateAnswerDisplay()
 
             if (event.key === 'Enter') {
                 void this.submitCalculation()
@@ -527,23 +618,99 @@ export class GameScene extends Phaser.Scene {
     private openAnswer() {
         this.answerOpen = true
         this.answer = ''
+        const width = this.scale.width
+        const height = this.scale.height
+        const centerX = width / 2
+        const centerY = height / 2
+        const scale = Math.min(1, (height - 20) / 340)
+        const panelWidth = Math.min(430, width - 24)
+        this.answerControls?.destroy()
+        const controls = this.add.container(0, 0).setDepth(29)
+        this.answerControls = controls
+        const backdrop = this.add.rectangle(centerX, centerY, width, height, theme.background, 0.82)
+            .setInteractive()
+        const panel = this.add.rectangle(centerX, centerY, panelWidth, 330 * scale, theme.surface, 0.98)
+            .setStrokeStyle(1, theme.cyan, 0.85)
+        controls.add([backdrop, panel])
         this.answerPanel
-            .setText('TERMINAL CIENTÍFICO\n\nUse P = m × g com as pistas da tripulação.\nDigite o peso em Marte e pressione Enter.')
+            .setPosition(centerX, centerY - 106 * scale)
+            .setFontSize(Math.max(14, 19 * scale))
+            .setText('TERMINAL CIENTÍFICO\n\nUse P = m × g com as pistas da tripulação.\nDigite o peso em Marte.')
             .setVisible(true)
-        this.answerText.setText('Resposta: _   •   Enter confirma   •   E cancela')
+        this.answerText
+            .setPosition(centerX, centerY - 48 * scale)
+            .setFontSize(Math.max(16, 21 * scale))
+            .setText('37,1 N = ?')
             .setVisible(true)
+
+        const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', '⌫']
+        const keyWidth = Math.min(64, (panelWidth - 54) / 3) * scale
+        const keyHeight = 28 * scale
+        const gap = 6 * scale
+        const startY = centerY - 8 * scale
+        keys.forEach((key, index) => {
+            const column = index % 3
+            const row = Math.floor(index / 3)
+            const x = centerX + (column - 1) * (keyWidth + gap)
+            const y = startY + row * (keyHeight + gap)
+            const button = this.add.rectangle(x, y, keyWidth, keyHeight, theme.surfaceSoft)
+                .setStrokeStyle(1, theme.border)
+                .setInteractive({ useHandCursor: true })
+            const label = this.add.text(x, y, key, {
+                fontFamily: 'Segoe UI, sans-serif',
+                fontSize: '16px',
+                fontStyle: 'bold',
+                color: '#f1f5ff',
+            }).setOrigin(0.5)
+            button.on('pointerover', () => button.setStrokeStyle(1, theme.cyan))
+            button.on('pointerout', () => button.setStrokeStyle(1, theme.border))
+            button.on('pointerdown', () => {
+                if (key === '⌫') this.answer = this.answer.slice(0, -1)
+                else if (key !== ',' || !/[.,]/.test(this.answer)) this.answer += key
+                this.updateAnswerDisplay()
+            })
+            controls.add([button, label])
+        })
+
+        const actionY = centerY + 132 * scale
+        const addActionButton = (x: number, label: string, fill: number, action: () => void) => {
+            const button = this.add.rectangle(x, actionY, 126 * scale, 34 * scale, fill)
+                .setStrokeStyle(1, theme.cyan, 0.65)
+                .setInteractive({ useHandCursor: true })
+            const text = this.add.text(x, actionY, label, {
+                fontFamily: 'Segoe UI, sans-serif',
+                fontSize: `${Math.max(10, 13 * scale)}px`,
+                fontStyle: 'bold',
+                color: '#ffffff',
+            }).setOrigin(0.5)
+            button.on('pointerdown', action)
+            controls.add([button, text])
+        }
+        addActionButton(centerX - 69 * scale, 'CANCELAR', theme.surfaceSoft, () => this.closeAnswer())
+        addActionButton(centerX + 69 * scale, 'CALCULAR', theme.purple, () => void this.submitCalculation())
+        this.children.bringToTop(this.answerPanel)
+        this.children.bringToTop(this.answerText)
     }
 
     private closeAnswer() {
         this.answerOpen = false
         this.answerPanel.setVisible(false)
         this.answerText.setVisible(false)
+        this.answerControls?.destroy()
+        this.answerControls = null
+    }
+
+    private updateAnswerDisplay() {
+        this.answerText
+            .setColor('#55d6e8')
+            .setText(`RESPOSTA: ${this.answer || '—'} N`)
     }
 
     private async submitCalculation() {
         if (this.actionBusy) return
         const normalized = this.answer.replace(',', '.')
         if (Number(normalized) !== 37.1) {
+            this.answerText.setColor('#ff8e9a').setText('VALOR INCORRETO · confira 10 × 3,71')
             this.showStatus('Resposta incorreta. Reconfiram as pistas: 10 × 3,71.', true)
             return
         }
@@ -596,11 +763,12 @@ export class GameScene extends Phaser.Scene {
     private refreshHud() {
         if (!this.taskText) return
         const completed = Object.values(this.mission.tasks).filter(Boolean).length
+        this.scoreText.setText(`SCORE  ${this.score}`)
         this.taskText.setText([
-            `TAREFAS ${completed}/3`,
-            `${this.mission.tasks.investigation ? '[✓]' : '[ ]'} Investigação científica`,
-            `${this.mission.tasks.repair ? '[✓]' : '[ ]'} Reparo cooperativo`,
-            `${this.mission.tasks.activation ? '[✓]' : '[ ]'} Ativação da nave`,
+            `MISSÃO ${completed}/3`,
+            `${this.mission.tasks.investigation ? '✓' : '○'} Investigação`,
+            `${this.mission.tasks.repair ? '✓' : '○'} Reparação`,
+            `${this.mission.tasks.activation ? '✓' : '○'} Ativação`,
         ].join('\n'))
     }
 
@@ -610,7 +778,7 @@ export class GameScene extends Phaser.Scene {
         const minutes = Math.floor(remaining / 60)
         const seconds = remaining % 60
         this.timerText.setText(`O₂  ${minutes}:${seconds.toString().padStart(2, '0')}`)
-        this.timerText.setColor(remaining <= 30 ? '#c62828' : '#17243b')
+        this.timerText.setColor(remaining <= 30 ? '#ff6b7a' : '#f1f5ff')
         if (remaining === 0 && !this.expirationSent) {
             this.expirationSent = true
             if (this.isDemo) {
@@ -644,22 +812,22 @@ export class GameScene extends Phaser.Scene {
         const card = this.add.rectangle(0, 0, Math.min(480, this.scale.width - 32), 260, theme.surface)
             .setStrokeStyle(1, theme.border)
         const title = this.add.text(0, -45, victory ? 'MISSÃO CONCLUÍDA!' : 'OXIGÊNIO ESGOTADO', {
-            fontFamily: 'Arial, sans-serif',
+            fontFamily: 'Segoe UI, sans-serif',
             fontSize: '28px',
             fontStyle: 'bold',
-            color: victory ? '#4d966e' : '#ae5264',
+            color: victory ? '#42b883' : '#ff6b7a',
         }).setOrigin(0.5)
         const score = this.add.text(0, 2, `Pontuação da tripulação: ${this.score}`, {
-            fontFamily: 'Arial, sans-serif',
+            fontFamily: 'Segoe UI, sans-serif',
             fontSize: '18px',
-            color: '#352442',
+            color: '#f1f5ff',
         }).setOrigin(0.5)
         const replay = this.add.text(0, 54, 'JOGAR NOVAMENTE', {
-            fontFamily: 'Arial, sans-serif',
+            fontFamily: 'Segoe UI, sans-serif',
             fontSize: '15px',
             fontStyle: 'bold',
-            color: this.crewPlayer?.is_host ? '#684080' : '#998da0',
-            backgroundColor: '#f4eff8',
+            color: this.crewPlayer?.is_host ? '#ffffff' : '#71809f',
+            backgroundColor: '#392d62',
             padding: { x: 16, y: 10 },
         }).setOrigin(0.5)
         if (this.mission.testMode) replay.setText('REPETIR TESTE')
@@ -668,15 +836,22 @@ export class GameScene extends Phaser.Scene {
             replay.on('pointerdown', () => this.replay())
         }
         const exit = this.add.text(0, 105, 'SAIR PARA O LOBBY', {
-            fontFamily: 'Arial, sans-serif',
+            fontFamily: 'Segoe UI, sans-serif',
             fontSize: '14px',
-            color: '#684080',
-            backgroundColor: '#f4eff8',
+            color: '#eaf5ff',
+            backgroundColor: '#18233b',
             padding: { x: 15, y: 9 },
         }).setOrigin(0.5).setInteractive({ useHandCursor: true })
         exit.on('pointerdown', () => this.exitToLobby())
         this.resultsPanel.add([backdrop, card, title, score, replay, exit])
-        this.resultsPanel.setVisible(true)
+        this.resultsPanel.setVisible(true).setAlpha(0).setScale(0.94)
+        this.tweens.add({
+            targets: this.resultsPanel,
+            alpha: 1,
+            scale: 1,
+            duration: 220,
+            ease: 'Back.Out',
+        })
         this.statusText.setVisible(false)
     }
 
@@ -684,6 +859,8 @@ export class GameScene extends Phaser.Scene {
         if (!this.room || !this.crewPlayer?.is_host || !this.finished) return
         try {
             await startRoom(this.room, this.crewPlayer, this.mission.testMode ?? false)
+            this.resultsPanel.setVisible(false)
+            this.finished = false
         } catch (error) {
             this.showStatus(error instanceof Error ? error.message : 'Não foi possível reiniciar.', true)
         }
@@ -698,19 +875,34 @@ export class GameScene extends Phaser.Scene {
                 return
             }
         }
-        this.scene.start('LobbyScene')
+        this.cameras.main.fadeOut(220, 7, 11, 25)
+        this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+            this.scene.start('LobbyScene')
+        })
     }
 
     private playerColor() {
-        if (!this.crewPlayer) return 0x55d6be
+        if (!this.crewPlayer) return theme.cyan
         return Number.parseInt(this.crewPlayer.color.replace('#', ''), 16) || 0x55d6be
+    }
+
+    private roleColor() {
+        const colors: Record<CrewRole, number> = {
+            pilot: theme.pilot,
+            gunner: theme.gunner,
+            engineer: theme.engineer,
+            explorer: theme.explorer,
+        }
+        return this.crewPlayer ? colors[this.crewPlayer.role] : theme.cyan
     }
 
     private showStatus(message: string, isError = false) {
         if (!this.statusText) return
         const sequence = ++this.noticeSequence
         this.statusText.setText(message)
-        this.statusText.setColor(isError ? '#ae5264' : '#352442')
+        this.statusText.setColor(isError ? '#ff8e9a' : '#f1f5ff')
+        this.statusText.setBackgroundColor(isError ? '#351b2b' : '#111a2e')
+        this.statusText.setStroke(isError ? '#f05252' : '#55d6e8', 0.18)
         this.statusText.setVisible(true)
         this.messageTimer?.remove(false)
         this.messageTimer = this.time.delayedCall(6000, () => {
@@ -722,10 +914,13 @@ export class GameScene extends Phaser.Scene {
 
     private cleanup() {
         this.input.keyboard?.off('keydown', this.keyHandler)
+        this.input.off('pointerup', this.releaseTouchControls, this)
         this.stopWatching?.()
         this.stopWatching = null
         this.gameChannel?.unsubscribe()
         this.gameChannel = null
+        this.answerControls?.destroy()
+        this.answerControls = null
         this.messageTimer?.remove(false)
     }
 }

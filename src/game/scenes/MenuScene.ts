@@ -9,6 +9,7 @@ export class MenuScene extends Phaser.Scene {
     create() {
         this.cameras.main.setBackgroundColor(theme.background)
         drawSoftStars(this, 65)
+        this.cameras.main.fadeIn(220, 7, 11, 25)
 
         const width = this.scale.width
         const height = this.scale.height
@@ -26,16 +27,16 @@ export class MenuScene extends Phaser.Scene {
             .setStrokeStyle(1, theme.purple)
             .setAngle(-24)
         this.add.text(centerX - headerWidth / 2 + 65, headerY, 'AstroLearn', {
-            fontFamily: 'Arial, sans-serif',
+            fontFamily: 'Segoe UI, sans-serif',
             fontSize: '22px',
             fontStyle: 'bold',
-            color: '#352442',
+            color: '#f1f5ff',
         }).setOrigin(0, 0.5)
         this.add.text(centerX + headerWidth / 2 - 24, headerY, compact || shortScreen ? 'JOGO STEAM' : 'JOGO STEAM  ·  COOPERATIVO', {
-            fontFamily: 'Arial, sans-serif',
+            fontFamily: 'Segoe UI, sans-serif',
             fontSize: compact ? '10px' : '12px',
             fontStyle: 'bold',
-            color: '#786d7f',
+            color: '#a2aec8',
         }).setOrigin(1, 0.5)
 
         const heroTop = headerY + 90
@@ -63,9 +64,9 @@ export class MenuScene extends Phaser.Scene {
 
         if (!compact || height > 680) {
             this.add.text(centerX, height - 28, 'CIÊNCIA  ·  TECNOLOGIA  ·  ENGENHARIA  ·  ARTES  ·  MATEMÁTICA', {
-                fontFamily: 'Arial, sans-serif',
+                fontFamily: 'Segoe UI, sans-serif',
                 fontSize: compact ? '9px' : '12px',
-                color: '#968a9c',
+                color: '#71809f',
                 letterSpacing: 1,
             }).setOrigin(0.5)
         }
@@ -84,18 +85,18 @@ export class MenuScene extends Phaser.Scene {
         )
             .setStrokeStyle(1, theme.border)
         this.add.text(badge.x, badge.y, '✦  UMA MISSÃO STEAM EM EQUIPE', {
-            fontFamily: 'Arial, sans-serif',
+            fontFamily: 'Segoe UI, sans-serif',
             fontSize: '11px',
             fontStyle: 'bold',
-            color: '#80638e',
+            color: '#55d6e8',
             letterSpacing: 1,
         }).setOrigin(0.5)
 
         this.add.text(x, y - 30 * verticalScale, 'Aprender é', {
-            fontFamily: 'Arial, sans-serif',
+            fontFamily: 'Segoe UI, sans-serif',
             fontSize: `${Math.min(70, Math.max(42, this.scale.width * 0.052))}px`,
             fontStyle: 'bold',
-            color: '#352442',
+            color: '#f1f5ff',
             wordWrap: { width: textWidth },
             align: centered ? 'center' : 'left',
         }).setOrigin(originX, 0.5)
@@ -103,7 +104,7 @@ export class MenuScene extends Phaser.Scene {
             fontFamily: 'Arial, sans-serif',
             fontSize: `${Math.min(70, Math.max(42, this.scale.width * 0.052))}px`,
             fontStyle: 'bold',
-            color: '#8050a0',
+            color: '#a891ff',
             wordWrap: { width: textWidth },
             align: centered ? 'center' : 'left',
         }).setOrigin(originX, 0.5)
@@ -111,20 +112,20 @@ export class MenuScene extends Phaser.Scene {
         this.add.text(x, y + 112 * verticalScale, this.scale.height < 620
             ? 'Explore uma nave, encontre pistas e resolva desafios em equipe. Cada pista conta.'
             : 'Explore uma nave, encontre pistas e resolva desafios com sua tripulação. Aqui, cada pessoa tem uma parte importante da resposta.', {
-            fontFamily: 'Arial, sans-serif',
+            fontFamily: 'Segoe UI, sans-serif',
             fontSize: this.scale.height < 620 ? '16px' : '18px',
-            color: '#786d7f',
+            color: '#a2aec8',
             lineSpacing: 6,
             wordWrap: { width: textWidth },
             align: centered ? 'center' : 'left',
         }).setOrigin(originX, 0)
 
         const buttonX = centered ? x : x + 118
-        const buttonY = y + (this.scale.height < 620 ? 280 : 216) * verticalScale
+        const buttonY = y + (this.scale.height < 620 ? 280 : 252) * verticalScale
         const button = this.add.rectangle(buttonX, buttonY, 236, 58, theme.purple)
             .setInteractive({ useHandCursor: true })
         const buttonText = this.add.text(buttonX, buttonY, 'Começar missão  →', {
-            fontFamily: 'Arial, sans-serif',
+            fontFamily: 'Segoe UI, sans-serif',
             fontSize: '18px',
             fontStyle: 'bold',
             color: '#ffffff',
@@ -139,39 +140,53 @@ export class MenuScene extends Phaser.Scene {
             button.setScale(1)
             buttonText.setScale(1)
         })
-        button.on('pointerdown', () => this.scene.start('LobbyScene'))
+        button.on('pointerdown', () => {
+            this.cameras.main.fadeOut(220, 7, 11, 25)
+            this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+                this.scene.start('LobbyScene')
+            })
+        })
 
-        this.add.circle(buttonX + 139, buttonY + (this.scale.height < 620 ? 92 : 67) * verticalScale, 4, theme.purple, 0.7)
-        this.add.text(buttonX + 152, buttonY + (this.scale.height < 620 ? 92 : 67) * verticalScale, 'Partidas curtas  ·  Até 4 tripulantes', {
-            fontFamily: 'Arial, sans-serif',
-            fontSize: '13px',
-            color: '#786d7f',
-        }).setOrigin(0, 0.5)
+        const infoY = buttonY + (this.scale.height < 620 ? 92 : 67) * verticalScale
+        if (centered) {
+            this.add.text(buttonX, infoY, 'Partidas curtas  ·  Até 4 tripulantes', {
+                fontFamily: 'Segoe UI, sans-serif',
+                fontSize: '12px',
+                color: '#a2aec8',
+            }).setOrigin(0.5, 0.5)
+        } else {
+            this.add.circle(buttonX + 139, infoY, 4, theme.purple, 0.7)
+            this.add.text(buttonX + 152, infoY, 'Partidas curtas  ·  Até 4 tripulantes', {
+                fontFamily: 'Segoe UI, sans-serif',
+                fontSize: '13px',
+                color: '#a2aec8',
+            }).setOrigin(0, 0.5)
+        }
 
     }
 
     private createPlanet(x: number, y: number, radius: number) {
-        this.add.circle(x, y, radius + 46, 0xf1eaf4, 0.76)
-        this.add.circle(x, y, radius + 27, 0xf8edf0, 0.8)
+        this.add.circle(x, y, radius + 46, 0x35285f, 0.45)
+        this.add.circle(x, y, radius + 27, 0x1a3155, 0.75)
         this.add.ellipse(x, y + 12, radius * 2.65, radius * 0.72)
-            .setStrokeStyle(3, 0xc4a7d2, 0.85)
+            .setStrokeStyle(3, theme.purple, 0.85)
             .setAngle(-18)
             .setDepth(1)
 
-        this.add.circle(x, y, radius, 0x8ebfd1)
-            .setStrokeStyle(4, theme.surface)
+        this.add.circle(x, y, radius, 0x164868)
+            .setStrokeStyle(3, theme.cyan)
             .setDepth(2)
-        this.add.ellipse(x - radius * 0.28, y - radius * 0.25, radius * 0.72, radius * 0.43, 0xdceee1)
+        this.add.ellipse(x - radius * 0.28, y - radius * 0.25, radius * 0.72, radius * 0.43, theme.cyan)
             .setAngle(-22)
             .setDepth(3)
-        this.add.ellipse(x + radius * 0.25, y + radius * 0.08, radius * 0.63, radius * 0.37, 0x79aa91)
+        this.add.ellipse(x + radius * 0.25, y + radius * 0.08, radius * 0.63, radius * 0.37, theme.engineer)
             .setAngle(28)
             .setDepth(3)
-        this.add.ellipse(x - radius * 0.02, y + radius * 0.49, radius * 1.2, radius * 0.22, 0x6da5bd)
+        this.add.ellipse(x - radius * 0.02, y + radius * 0.49, radius * 1.2, radius * 0.22, theme.pilot)
             .setAngle(-9)
             .setDepth(3)
 
-        const crewColors = [0x8050a0, 0xf1c55b, 0x62ac88, 0xe78681]
+        const crewColors = [theme.pilot, theme.gunner, theme.engineer, theme.explorer]
         crewColors.forEach((color, index) => {
             const angle = (Math.PI * 2 * index) / crewColors.length - Math.PI / 2
             const dotX = x + Math.cos(angle) * (radius + 54)
